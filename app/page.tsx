@@ -164,7 +164,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-lg">LPL</span>
+                <Phone className="h-5 w-5 text-primary-foreground" />
               </div>
               <div>
                 <h1 className="text-xl font-semibold tracking-tight">Contact Driver Analytics</h1>
@@ -611,7 +611,7 @@ export default function Dashboard() {
         <footer className="pt-6 border-t text-center text-xs text-muted-foreground">
           <div className="flex items-center justify-center gap-2">
             <Database className="h-4 w-4" />
-            <span>Data source: LPL_CONTACT_ANALYTICS.DEMO</span>
+            <span>Data source: CONTACT_ANALYTICS.ANALYTICS</span>
             <span className="mx-2">•</span>
             <span>AI: Snowflake Cortex (Llama 3.1 70B, Claude 3.5 Sonnet)</span>
             <span className="mx-2">•</span>

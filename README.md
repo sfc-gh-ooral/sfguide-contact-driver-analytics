@@ -34,8 +34,8 @@ Open [http://localhost:3000](http://localhost:3000). The dashboard loads with 13
 
 Open a **Snowsight SQL Worksheet** and paste the contents of [`sql/setup.sql`](sql/setup.sql). Execute all statements. This creates:
 
-- Database `LPL_CONTACT_ANALYTICS` with schema `DEMO`
-- Warehouse `LPL_CORTEX_WH` (Medium, auto-suspend 60s)
+- Database `CONTACT_ANALYTICS` with schema `ANALYTICS`
+- Warehouse `CORTEX_WH` (Medium, auto-suspend 60s)
 - Required grants
 
 ### Step 2: Load Your Data
@@ -69,9 +69,9 @@ Edit `.env.local` with your Snowflake account details:
 SNOWFLAKE_ACCOUNT=xy12345.us-east-1
 SNOWFLAKE_USER=your_username
 SNOWFLAKE_PRIVATE_KEY_PATH=./rsa_key.p8
-SNOWFLAKE_WAREHOUSE=LPL_CORTEX_WH
-SNOWFLAKE_DATABASE=LPL_CONTACT_ANALYTICS
-SNOWFLAKE_SCHEMA=DEMO
+SNOWFLAKE_WAREHOUSE=CORTEX_WH
+SNOWFLAKE_DATABASE=CONTACT_ANALYTICS
+SNOWFLAKE_SCHEMA=ANALYTICS
 SNOWFLAKE_ROLE=SYSADMIN
 ```
 

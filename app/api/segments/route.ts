@@ -9,7 +9,7 @@ export async function GET() {
       CUSTOMER_SEGMENT: string;
     }>(`
       SELECT DISTINCT line_of_business, product_category, customer_segment
-      FROM LPL_CONTACT_ANALYTICS.DEMO.CALL_TRANSCRIPTS
+      FROM CONTACT_ANALYTICS.ANALYTICS.CALL_TRANSCRIPTS
     `);
 
     const lobs = [...new Set(results.map(r => r.LINE_OF_BUSINESS))];

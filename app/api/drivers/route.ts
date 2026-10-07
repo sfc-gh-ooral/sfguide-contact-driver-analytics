@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         AVG(avg_sentiment) as avg_sentiment,
         SUM(escalations) as escalations,
         AVG(resolution_rate) as resolution_rate
-      FROM LPL_CONTACT_ANALYTICS.DEMO.V_CALL_DRIVER_ANALYSIS
+      FROM CONTACT_ANALYTICS.ANALYTICS.V_CALL_DRIVER_ANALYSIS
       ${whereClause}
       GROUP BY line_of_business, product_category, customer_segment, caller_type
       ORDER BY call_volume DESC

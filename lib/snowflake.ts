@@ -22,8 +22,8 @@ function getConfig(): snowflake.ConnectionOptions {
   const base = {
     account: process.env.SNOWFLAKE_ACCOUNT || "",
     warehouse: process.env.SNOWFLAKE_WAREHOUSE || "COMPUTE_WH",
-    database: process.env.SNOWFLAKE_DATABASE || "LPL_CONTACT_ANALYTICS",
-    schema: process.env.SNOWFLAKE_SCHEMA || "DEMO",
+    database: process.env.SNOWFLAKE_DATABASE || "CONTACT_ANALYTICS",
+    schema: process.env.SNOWFLAKE_SCHEMA || "ANALYTICS",
     role: process.env.SNOWFLAKE_ROLE || "SYSADMIN",
   };
 
@@ -126,7 +126,7 @@ const TRANSCRIPT_TEMPLATES = [
   {
     reason: "Account Balance Inquiry",
     sentiment: 0.45,
-    transcript: `Agent: Good morning, thank you for calling LPL Financial Customer Service. My name is Rebecca, and I'll be assisting you today. Before we begin, may I have your full name and account number for verification purposes?
+    transcript: `Agent: Good morning, thank you for calling Customer Service. My name is Rebecca, and I'll be assisting you today. Before we begin, may I have your full name and account number for verification purposes?
 
 Client: Hi Rebecca, this is Margaret Chen. My account number is 4521-889-7763.
 
@@ -150,12 +150,12 @@ Agent: I'll send that right over. You should receive it within the next few minu
 
 Client: No, that covers everything. Thank you for being so thorough, Rebecca.
 
-Agent: You're very welcome. Thank you for being a valued LPL Financial client. Have a wonderful day, and best of luck with your advisor meeting next week!`
+Agent: You're very welcome. Thank you for being a valued our company client. Have a wonderful day, and best of luck with your advisor meeting next week!`
   },
   {
     reason: "Transfer Request",
     sentiment: 0.52,
-    transcript: `Agent: Thank you for calling LPL Financial. This is David speaking. How may I assist you today?
+    transcript: `Agent: Thank you for calling our company. This is David speaking. How may I assist you today?
 
 Advisor: Hi David, this is Jennifer Martinez from Coastal Wealth Advisors. I'm calling on behalf of one of my clients who wants to initiate an external transfer.
 
@@ -196,7 +196,7 @@ Agent: You're welcome, Ms. Martinez. Have a great day, and please don't hesitate
   {
     reason: "Portfolio Rebalance",
     sentiment: 0.61,
-    transcript: `Agent: LPL Financial, this is Michael speaking. How can I help you today?
+    transcript: `Agent: our company, this is Michael speaking. How can I help you today?
 
 Advisor: Hi Michael, this is Thomas Anderson from Summit Financial Group. I need assistance with a portfolio rebalance for one of my high-net-worth clients.
 
@@ -228,12 +228,12 @@ Agent: Will do. You should receive the summary within 24 hours after the trades 
 
 Advisor: That's everything. Thanks for making this so smooth, Michael.
 
-Agent: My pleasure, Mr. Anderson. Thank you for calling LPL Financial.`
+Agent: My pleasure, Mr. Anderson. Thank you for calling our company.`
   },
   {
     reason: "Fee Question",
     sentiment: 0.28,
-    transcript: `Agent: Thank you for calling LPL Financial. My name is Sarah. How can I assist you today?
+    transcript: `Agent: Thank you for calling our company. My name is Sarah. How can I assist you today?
 
 Client: Hi Sarah. I'm calling because I received my quarterly statement and I'm confused about some fees that were charged. Frankly, I'm a bit upset because these seem higher than what I expected.
 
@@ -265,12 +265,12 @@ Agent: No need to apologize at all—you have every right to question fees on yo
 
 Client: No, I think that covers it. Thank you for explaining everything so patiently.
 
-Agent: It was my pleasure, Mr. Morrison. Thank you for being an LPL Financial client. Have a great rest of your day!`
+Agent: It was my pleasure, Mr. Morrison. Thank you for being an our company client. Have a great rest of your day!`
   },
   {
     reason: "Technical Support",
     sentiment: -0.15,
-    transcript: `Agent: LPL Financial Technical Support, this is Kevin. How can I help you today?
+    transcript: `Agent: our company Technical Support, this is Kevin. How can I help you today?
 
 Client: Hi Kevin. I've been trying to log into my account online for the past two hours and keep getting an error message. This is incredibly frustrating because I need to check on a pending transaction.
 
@@ -311,7 +311,7 @@ Agent: Absolutely, Mr. Smith. I apologize again for the inconvenience. Thank you
   {
     reason: "Distribution Request",
     sentiment: 0.35,
-    transcript: `Agent: Good afternoon, thank you for calling LPL Financial. My name is Amanda. How may I assist you today?
+    transcript: `Agent: Good afternoon, thank you for calling our company. My name is Amanda. How may I assist you today?
 
 Client: Hi Amanda. I need to take a distribution from my IRA. I'm 67 years old and this will be my first withdrawal.
 
@@ -352,7 +352,7 @@ Agent: You're very welcome. It's important to understand the tax impact of retir
   {
     reason: "Beneficiary Update",
     sentiment: 0.42,
-    transcript: `Agent: LPL Financial, this is Christine speaking. How may I help you today?
+    transcript: `Agent: our company, this is Christine speaking. How may I help you today?
 
 Client: Hello Christine. I need to update the beneficiaries on my retirement accounts. I recently got remarried and need to add my new spouse.
 
@@ -388,12 +388,12 @@ Agent: The change is effective immediately upon processing, which I'll complete 
 
 Client: No, that covers it. Thank you for making this so easy, Christine.
 
-Agent: My pleasure! Congratulations again on your marriage. Thank you for choosing LPL Financial. Have a wonderful day!`
+Agent: My pleasure! Congratulations again on your marriage. Thank you for choosing our company. Have a wonderful day!`
   },
   {
     reason: "Account Opening",
     sentiment: 0.58,
-    transcript: `Agent: Thank you for calling LPL Financial New Accounts. My name is Brandon. How can I help you today?
+    transcript: `Agent: Thank you for calling our company New Accounts. My name is Brandon. How can I help you today?
 
 Advisor: Hi Brandon, this is Michelle Torres from Pinnacle Advisory Group. I have a new client who wants to open a brokerage account and roll over an old 401k.
 
@@ -409,7 +409,7 @@ Agent: For Fidelity 401ks, we recommend a direct trustee-to-trustee transfer to 
 
 Advisor: Should we liquidate the 401k positions before or after the transfer?
 
-Agent: Good question. I recommend transferring "in kind" whenever possible—meaning we transfer the actual investments rather than cashing out. This avoids any market exposure during the transfer period. Once the assets arrive in the LPL IRA, you can then reallocate according to your investment strategy. However, if Fidelity has any proprietary funds that can't transfer, those would need to be liquidated first.
+Agent: Good question. I recommend transferring "in kind" whenever possible—meaning we transfer the actual investments rather than cashing out. This avoids any market exposure during the transfer period. Once the assets arrive in the new IRA, you can then reallocate according to your investment strategy. However, if Fidelity has any proprietary funds that can't transfer, those would need to be liquidated first.
 
 Advisor: That makes sense. What about investment minimums for the new accounts?
 
@@ -425,14 +425,14 @@ Agent: Once we receive all the paperwork, the new accounts typically open within
 
 Advisor: I think that covers the basics. Can you email me the forms?
 
-Agent: Already sending them to your advisor email on file. You should receive the complete new account package within the next few minutes. Welcome to LPL Financial, and congratulations on the new client!
+Agent: Already sending them to your advisor email on file. You should receive the complete new account package within the next few minutes. Welcome to our company, and congratulations on the new client!
 
 Advisor: Thanks Brandon. Very helpful as always.`
   },
   {
     reason: "Complaint",
     sentiment: -0.65,
-    transcript: `Agent: Thank you for calling LPL Financial. My name is Patricia. How may I assist you today?
+    transcript: `Agent: Thank you for calling our company. My name is Patricia. How may I assist you today?
 
 Client: I need to speak with a supervisor. I am extremely unhappy with how my account has been handled.
 
@@ -473,7 +473,7 @@ Agent: You have my word, Mr. Harris. I'm sending you a confirmation email right 
   {
     reason: "Investment Advice Question",
     sentiment: 0.51,
-    transcript: `Agent: LPL Financial Advisory Support, this is Daniel speaking. How can I help you today?
+    transcript: `Agent: our company Advisory Support, this is Daniel speaking. How can I help you today?
 
 Advisor: Hi Daniel, this is Sandra Kim from Evergreen Wealth Management. I have a question about alternative investment options for a client who's interested in diversifying beyond traditional stocks and bonds.
 

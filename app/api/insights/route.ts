@@ -23,7 +23,7 @@ export async function POST(request: Request) {
         SUM(call_volume) as call_volume,
         AVG(avg_sentiment) as avg_sentiment,
         SUM(escalations) as escalations
-      FROM LPL_CONTACT_ANALYTICS.DEMO.V_CALL_DRIVER_ANALYSIS
+      FROM CONTACT_ANALYTICS.ANALYTICS.V_CALL_DRIVER_ANALYSIS
       WHERE week_start >= DATEADD(day, -${dateRange}, CURRENT_DATE())
       ${segment && segment !== "all" ? `AND line_of_business = '${segment}'` : ""}
       GROUP BY line_of_business
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     const summaries = await query<{ AUTOCALL_SUMMARY: string }>(`
       SELECT autocall_summary
-      FROM LPL_CONTACT_ANALYTICS.DEMO.CALL_TRANSCRIPTS
+      FROM CONTACT_ANALYTICS.ANALYTICS.CALL_TRANSCRIPTS
       WHERE call_date >= DATEADD(day, -${dateRange}, CURRENT_DATE())
       ${segment && segment !== "all" ? `AND line_of_business = '${segment}'` : ""}
       LIMIT 100

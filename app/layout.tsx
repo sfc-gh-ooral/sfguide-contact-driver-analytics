@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LPL Contact Driver Analytics",
+  title: "Contact Driver Analytics",
   description: "AI-powered contact center analytics powered by Snowflake Cortex",
 };
 

@@ -13,7 +13,7 @@ interface TrendRow {
 export async function GET() {
   try {
     const results = await query<TrendRow>(`
-      SELECT * FROM LPL_CONTACT_ANALYTICS.DEMO.V_TREND_SUMMARY
+      SELECT * FROM CONTACT_ANALYTICS.ANALYTICS.V_TREND_SUMMARY
       ORDER BY WEEK_START DESC
       LIMIT 13
     `);
