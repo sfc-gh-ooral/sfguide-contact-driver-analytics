@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="snowflake-source" content="cortex-agent-authored" />
+  <title>Contact Driver Analytics — Snowflake Cortex AI</title>
+  <meta name="description" content="AI-powered contact center analytics built on Snowflake Cortex. Real-time call driver analysis, sentiment tracking, and automated insight generation." />
+  <style>
+    /* ── Reset & Foundation ── */
+    :root {
+      color-scheme: light dark;
+      --brand: #D91A8C;
+      --brand-dark: #9B1266;
+      --accent: #00C9A7;
+      --accent-dark: #009B81;
+      --snow: #29B5E8;
+      --snow-dark: #1E8AB0;
+      --hero-from: #1A0A2E;
+      --hero-via: #3D1155;
+      --hero-to: #6B1A5C;
+      --bg: light-dark(#FAFBFC, #0D1117);
+      --bg-card: light-dark(#FFFFFF, #161B22);
+      --bg-card-hover: light-dark(#F8F0FC, #1C2333);
+      --bg-muted: light-dark(#F3F4F6, #21262D);
+      --text: light-dark(#1F2937, #E6EDF3);
+      --text-muted: light-dark(#6B7280, #8B949E);
+      --text-inv: #FFFFFF;
+      --border: light-dark(#E5E7EB, #30363D);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: light-dark(0 1px 3px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.3));
+      --shadow-lg: light-dark(0 8px 30px rgba(0,0,0,0.08), 0 8px 30px rgba(0,0,0,0.4));
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+    }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { max-width: 100%; height: auto; }
+    a { color: var(--brand); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--brand-dark); }
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--snow); outline-offset: 2px; }
+    .skip-link {
+      position: absolute; top: -100px; left: 16px; background: var(--brand); color: #fff;
+      padding: 8px 16px; border-radius: var(--radius-sm); z-index: 1000; font-weight: 600;
+    }
+    .skip-link:focus { top: 16px; }
+
+    /* ── Layout ── */
+    .container { max-width: 1200px; width: 100%; margin: 0 auto; padding: 0 clamp(16px, 4vw, 32px); }
+    section { padding: clamp(48px, 8vw, 96px) 0; }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: light-dark(rgba(255,255,255,0.92), rgba(13,17,23,0.92));
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      transition: box-shadow 0.3s;
+    }
+    nav.scrolled { box-shadow: var(--shadow-lg); }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 32px);
+      display: flex; align-items: center; justify-content: space-between; height: 64px;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.05rem; color: var(--text); }
+    .nav-logo {
+      width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center;
+      justify-content: center; font-weight: 800; font-size: 0.65rem; color: #fff; letter-spacing: 0.5px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    }
+    .nav-links { display: flex; gap: 24px; list-style: none; }
+    .nav-links a { color: var(--text-muted); font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--brand); }
+    .nav-hamburger {
+      display: none; background: none; border: none; cursor: pointer;
+      width: 36px; height: 36px; position: relative; color: var(--text);
+    }
+    .nav-hamburger span {
+      display: block; width: 22px; height: 2px; background: currentColor; position: absolute;
+      left: 7px; transition: transform 0.3s, opacity 0.3s;
+    }
+    .nav-hamburger span:nth-child(1) { top: 10px; }
+    .nav-hamburger span:nth-child(2) { top: 17px; }
+    .nav-hamburger span:nth-child(3) { top: 24px; }
+    .nav-hamburger.open span:nth-child(1) { top: 17px; transform: rotate(45deg); }
+    .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.open span:nth-child(3) { top: 17px; transform: rotate(-45deg); }
+
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none; position: absolute; top: 64px; left: 0; right: 0;
+        flex-direction: column; gap: 0; background: light-dark(#fff, #161B22);
+        border-bottom: 1px solid var(--border); box-shadow: var(--shadow-lg);
+      }
+      .nav-links.open { display: flex; }
+      .nav-links a { padding: 14px clamp(16px, 4vw, 32px); display: block; }
+      .nav-hamburger { display: flex; align-items: center; justify-content: center; }
+    }
+
+    /* ── Hero ── */
+    .hero {
+      padding: clamp(120px, 16vw, 180px) 0 clamp(64px, 10vw, 120px);
+      background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-via) 50%, var(--hero-to) 100%);
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: ""; position: absolute; inset: 0;
+      background: radial-gradient(circle at 70% 20%, rgba(217,26,140,0.15), transparent 60%),
+                  radial-gradient(circle at 20% 80%, rgba(0,201,167,0.1), transparent 50%);
+    }
+    .hero .container { position: relative; z-index: 1; text-align: center; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px; background: rgba(41,181,232,0.15);
+      border: 1px solid rgba(41,181,232,0.3); border-radius: 100px; padding: 6px 16px;
+      font-size: 0.8rem; font-weight: 600; color: #29B5E8; margin-bottom: 24px;
+    }
+    .hero-badge svg { width: 16px; height: 16px; }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; color: #fff;
+      line-height: 1.15; margin-bottom: 16px; letter-spacing: -0.02em;
+    }
+    .hero h1 span { background: linear-gradient(90deg, var(--brand), #FF6EC7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: clamp(1rem, 2vw, 1.25rem); color: rgba(255,255,255,0.7); max-width: 640px; margin: 0 auto 32px; }
+    .hero-ctas { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 28px; border-radius: var(--radius-sm); font-weight: 600;
+      font-size: 0.95rem; border: none; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover { background: var(--brand-dark); color: #fff; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(217,26,140,0.3); }
+    .btn-ghost { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .hero-stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 24px;
+      margin-top: 56px; max-width: 680px; margin-left: auto; margin-right: auto;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat-val { font-size: 1.8rem; font-weight: 800; color: #fff; }
+    .hero-stat-label { font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+    /* ── Section Headers ── */
+    .section-header { text-align: center; margin-bottom: clamp(32px, 5vw, 56px); }
+    .section-label {
+      display: inline-block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--brand); margin-bottom: 12px;
+    }
+    .section-header h2 { font-size: clamp(1.5rem, 3.5vw, 2.25rem); font-weight: 800; letter-spacing: -0.02em; }
+    .section-header p { color: var(--text-muted); margin-top: 12px; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+    /* ── Pipeline Cards ── */
+    .pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
+    .pipeline-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 28px 24px; position: relative; transition: all 0.3s;
+    }
+    .pipeline-card:hover { border-color: var(--brand); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+    .pipeline-step {
+      width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1rem; color: #fff; margin-bottom: 16px;
+    }
+    .pipeline-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+    .pipeline-card p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; }
+
+    /* ── Cortex AI Cards ── */
+    .cortex-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .cortex-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 24px; transition: all 0.3s; position: relative; overflow: hidden;
+    }
+    .cortex-card:hover { border-color: var(--accent); box-shadow: var(--shadow-lg); }
+    .cortex-card::after {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--brand), var(--accent));
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .cortex-card:hover::after { opacity: 1; }
+    .cortex-card-icon {
+      width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px; font-size: 1.3rem;
+    }
+    .cortex-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .cortex-card p { color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; }
+    .cortex-card code {
+      display: block; margin-top: 12px; padding: 10px 12px; border-radius: 6px;
+      font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+      background: light-dark(#F8F0FC, #1C1030); color: light-dark(#7C3AED, #C084FC);
+      overflow-x: auto; white-space: pre;
+    }
+
+    /* ── Architecture ── */
+    .arch-flow {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-top: 32px;
+    }
+    .arch-node {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 16px 20px; text-align: center; min-width: 160px; transition: all 0.3s;
+    }
+    .arch-node:hover { border-color: var(--brand); box-shadow: var(--shadow); }
+    .arch-node-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .arch-node-title { font-weight: 700; font-size: 0.95rem; }
+    .arch-node-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+    .arch-arrow { font-size: 1.3rem; color: var(--text-muted); flex-shrink: 0; }
+    @media (max-width: 768px) {
+      .arch-flow { flex-direction: column; }
+      .arch-arrow { transform: rotate(90deg); }
+    }
+
+    /* ── Deploy Steps ── */
+    .deploy-steps { max-width: 720px; margin: 0 auto; }
+    .deploy-step {
+      display: flex; gap: 20px; padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .deploy-step:last-child { border-bottom: none; }
+    .deploy-num {
+      flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand), var(--hero-via));
+      color: #fff; font-weight: 800; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .deploy-step h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .deploy-step p { color: var(--text-muted); font-size: 0.9rem; }
+
+    /* ── Features Catalog ── */
+    .filter-tabs {
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 32px;
+    }
+    .filter-tab {
+      padding: 8px 18px; border-radius: 100px; border: 1px solid var(--border); background: var(--bg-card);
+      font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text-muted);
+    }
+    .filter-tab:hover { border-color: var(--brand); color: var(--brand); }
+    .filter-tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 24px; transition: all 0.3s;
+    }
+    .feature-card:hover { border-color: var(--brand); box-shadow: var(--shadow); transform: translateY(-1px); }
+    .feature-card[hidden] { display: none; }
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 12px; font-size: 1.1rem;
+    }
+    .feature-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; }
+    .feature-card p { color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; }
+    .feature-tag {
+      display: inline-block; margin-top: 10px; font-size: 0.7rem; font-weight: 600;
+      padding: 3px 10px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: clamp(32px, 5vw, 56px) 0;
+      background: light-dark(#F9FAFB, #0D1117);
+      border-top: 1px solid var(--border);
+    }
+    .footer-inner {
+      display: flex; flex-wrap: wrap; gap: 32px; justify-content: space-between; align-items: flex-start;
+    }
+    .footer-col h4 { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px; }
+    .footer-col a { display: block; color: var(--text-muted); font-size: 0.88rem; padding: 3px 0; transition: color 0.2s; }
+    .footer-col a:hover { color: var(--brand); }
+    .footer-bottom {
+      margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center;
+    }
+    .footer-disclaimer { font-size: 0.78rem; color: var(--text-muted); max-width: 560px; line-height: 1.5; }
+    .snow-badge {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--snow);
+    }
+    .snow-badge svg { width: 18px; height: 18px; }
+
+    /* ── Reveal Animation ── */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── Alt section bg ── */
+    .bg-alt { background: var(--bg-muted); }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <!-- ────── Nav ────── -->
+  <nav id="navbar">
+    <div class="nav-inner">
+      <a href="#" class="nav-brand">
+        <div class="nav-logo">LPL</div>
+        Contact Driver Analytics
+      </a>
+      <button class="nav-hamburger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" role="list">
+        <li><a href="#pipeline">How It Works</a></li>
+        <li><a href="#cortex">Cortex AI</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#deploy">Deploy</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ────── Hero ────── -->
+  <header class="hero" id="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        Powered by Snowflake Cortex AI
+      </div>
+      <h1>Transform Call Center Data<br/>Into <span>Actionable Intelligence</span></h1>
+      <p>An AI-powered analytics application that monitors contact drivers, scores sentiment, and generates executive insights — all running natively on Snowflake.</p>
+      <div class="hero-ctas">
+        <a href="#deploy" class="btn btn-primary">Get Started</a>
+        <a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics" class="btn btn-ghost">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="hero-stat-val">6</div><div class="hero-stat-label">Cortex AI Functions</div></div>
+        <div class="hero-stat"><div class="hero-stat-val">5</div><div class="hero-stat-label">API Endpoints</div></div>
+        <div class="hero-stat"><div class="hero-stat-val">0</div><div class="hero-stat-label">External Dependencies</div></div>
+        <div class="hero-stat"><div class="hero-stat-val">&lt;5 min</div><div class="hero-stat-label">Quick Start</div></div>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ────── Pipeline ────── -->
+    <section id="pipeline">
+      <div class="container">
+        <div class="section-header reveal">
+          <div class="section-label">How It Works</div>
+          <h2>End-to-End Call Analytics Pipeline</h2>
+          <p>From raw call transcripts to executive insights in four stages, powered entirely by Snowflake Cortex AI.</p>
+        </div>
+        <div class="pipeline reveal">
+          <div class="pipeline-card">
+            <div class="pipeline-step" style="background:linear-gradient(135deg,var(--brand),var(--brand-dark))">1</div>
+            <h3>Ingest</h3>
+            <p>Call transcripts land in Snowflake tables. The application connects directly via the Snowflake SDK with automatic OAuth, key-pair, or password authentication.</p>
+          </div>
+          <div class="pipeline-card">
+            <div class="pipeline-step" style="background:linear-gradient(135deg,#7C4DFF,#5C3BD4)">2</div>
+            <h3>Analyze</h3>
+            <p>Cortex SENTIMENT scores each call. CLASSIFY_TEXT categorizes drivers. EXTRACT_ANSWER pulls structured data. All running natively inside Snowflake.</p>
+          </div>
+          <div class="pipeline-card">
+            <div class="pipeline-step" style="background:linear-gradient(135deg,var(--accent),var(--accent-dark))">3</div>
+            <h3>Visualize</h3>
+            <p>Interactive dashboards show 13-week trends, driver breakdowns, sentiment distributions, and escalation tracking. Drill into any data point.</p>
+          </div>
+          <div class="pipeline-card">
+            <div class="pipeline-step" style="background:linear-gradient(135deg,var(--snow),var(--snow-dark))">4</div>
+            <h3>Insight</h3>
+            <p>Cortex COMPLETE generates executive summaries, key findings, and recommendations on demand. SUMMARIZE creates per-call abstracts automatically.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────── Cortex AI ────── -->
+    <section id="cortex" class="bg-alt">
+      <div class="container">
+        <div class="section-header reveal">
+          <div class="section-label">Snowflake Cortex AI</div>
+          <h2>Six AI Functions, Zero External APIs</h2>
+          <p>Every AI capability runs inside Snowflake — no data leaves your account, no third-party API keys required.</p>
+        </div>
+        <div class="cortex-grid reveal">
+          <div class="cortex-card">
+            <div class="cortex-card-icon" style="background:rgba(217,26,140,0.1);color:var(--brand)">&#9889;</div>
+            <h3>CORTEX.COMPLETE</h3>
+            <p>Generate executive summaries, key findings, and strategic recommendations using Llama 3.1 70B or Claude 3.5 Sonnet.</p>
+            <code>SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b',
+  'Summarize these call drivers...')</code>
+          </div>
+          <div class="cortex-card">
+            <div class="cortex-card-icon" style="background:rgba(0,201,167,0.1);color:var(--accent)">&#128200;</div>
+            <h3>CORTEX.SENTIMENT</h3>
+            <p>Score every call transcript from -1 (negative) to +1 (positive). Aggregate across segments for trend analysis.</p>
+            <code>SNOWFLAKE.CORTEX.SENTIMENT(transcript)
+  -- Returns: -1.0 to 1.0</code>
+          </div>
+          <div class="cortex-card">
+            <div class="cortex-card-icon" style="background:rgba(124,77,255,0.1);color:#7C4DFF">&#128221;</div>
+            <h3>CORTEX.SUMMARIZE</h3>
+            <p>Automatically generate concise abstracts from full call transcripts. Displayed in the transcript viewer alongside the original text.</p>
+            <code>SNOWFLAKE.CORTEX.SUMMARIZE(transcript)
+  -- Returns: text summary</code>
+          </div>
+          <div class="cortex-card">
+            <div class="cortex-card-icon" style="background:rgba(255,184,0,0.1);color:#FFB800">&#127991;</div>
+            <h3>CORTEX.CLASSIFY_TEXT</h3>
+            <p>Categorize calls into contact drivers and detect escalations. Powers the driver breakdown table and escalation KPIs.</p>
+            <code>SNOWFLAKE.CORTEX.CLASSIFY_TEXT(transcript,
+  ['billing','technical','sales'])</code>
+          </div>
+          <div class="cortex-card">
+            <div class="cortex-card-icon" style="background:rgba(255,82,82,0.1);color:#FF5252">&#128269;</div>
+            <h3>CORTEX.EXTRACT_ANSWER</h3>
+            <p>Pull structured answers from unstructured transcripts. Extract customer issues, resolutions, and action items.</p>
+            <code>SNOWFLAKE.CORTEX.EXTRACT_ANSWER(transcript,
+  'What was the customer issue?')</code>
+          </div>
+          <div class="cortex-card">
+            <div class="cortex-card-icon" style="background:rgba(41,181,232,0.1);color:var(--snow)">&#129520;</div>
+            <h3>CORTEX.EMBED_TEXT_768</h3>
+            <p>Generate 768-dimension vector embeddings for semantic search across your transcript corpus.</p>
+            <code>SNOWFLAKE.CORTEX.EMBED_TEXT_768(
+  'e5-base-v2', transcript)</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────── Architecture ────── -->
+    <section id="architecture">
+      <div class="container">
+        <div class="section-header reveal">
+          <div class="section-label">Architecture</div>
+          <h2>Built on Snowflake, End to End</h2>
+          <p>A modern stack where AI processing, storage, and compute all live inside your Snowflake account.</p>
+        </div>
+        <div class="arch-flow reveal">
+          <div class="arch-node">
+            <div class="arch-node-label" style="color:var(--brand)">Data Source</div>
+            <div class="arch-node-title">Call Transcripts</div>
+            <div class="arch-node-desc">CALL_TRANSCRIPTS table</div>
+          </div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-node">
+            <div class="arch-node-label" style="color:#7C4DFF">AI Processing</div>
+            <div class="arch-node-title">Cortex AI</div>
+            <div class="arch-node-desc">6 AI functions</div>
+          </div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-node">
+            <div class="arch-node-label" style="color:var(--accent)">Analytics</div>
+            <div class="arch-node-title">Views &amp; Aggregates</div>
+            <div class="arch-node-desc">V_TREND_SUMMARY, V_CALL_DRIVER_ANALYSIS</div>
+          </div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-node">
+            <div class="arch-node-label" style="color:var(--snow)">Application</div>
+            <div class="arch-node-title">Next.js Dashboard</div>
+            <div class="arch-node-desc">React + shadcn/ui + Recharts</div>
+          </div>
+        </div>
+        <div style="margin-top:40px; overflow-x:auto;" class="reveal">
+          <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border);">
+                <th style="text-align:left;padding:12px 16px;font-weight:700;">Layer</th>
+                <th style="text-align:left;padding:12px 16px;font-weight:700;">Technology</th>
+                <th style="text-align:left;padding:12px 16px;font-weight:700;">Purpose</th>
+              </tr>
+            </thead>
+            <tbody id="arch-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────── Deploy ────── -->
+    <section id="deploy" class="bg-alt">
+      <div class="container">
+        <div class="section-header reveal">
+          <div class="section-label">Get Started</div>
+          <h2>Deploy in Five Steps</h2>
+          <p>Run with mock data instantly, or connect to your Snowflake account for live analytics.</p>
+        </div>
+        <div class="deploy-steps reveal" id="deploy-steps"></div>
+        <div style="text-align:center;margin-top:40px;" class="reveal">
+          <a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics#deploy-with-live-data" class="btn btn-primary">View Full Setup Guide</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────── Features ────── -->
+    <section id="features">
+      <div class="container">
+        <div class="section-header reveal">
+          <div class="section-label">Capabilities</div>
+          <h2>Feature Catalog</h2>
+          <p>Everything the application provides out of the box.</p>
+        </div>
+        <div class="filter-tabs reveal" role="tablist" aria-label="Feature categories" id="filter-tabs"></div>
+        <div class="features-grid reveal" id="features-grid"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ────── Footer ────── -->
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-col">
+          <h4>Project</h4>
+          <a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics">GitHub Repository</a>
+          <a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics#quick-start-mock-data">Quick Start</a>
+          <a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics#deploy-with-live-data">Deploy Guide</a>
+        </div>
+        <div class="footer-col">
+          <h4>Snowflake</h4>
+          <a href="https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions">Cortex LLM Functions</a>
+          <a href="https://docs.snowflake.com/en/user-guide/snowflake-cortex">Cortex AI Overview</a>
+          <a href="https://docs.snowflake.com/">Snowflake Documentation</a>
+        </div>
+        <div class="footer-col">
+          <h4>Resources</h4>
+          <a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics/blob/main/LICENSE">Apache 2.0 License</a>
+          <a href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics/blob/main/LEGAL.md">Legal Disclaimer</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <div class="footer-disclaimer">
+          Contact Driver Analytics is open source under the Apache 2.0 license. Not affiliated with or endorsed by any specific financial services company.
+        </div>
+        <div class="snow-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Powered by Snowflake
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ── Data ──
+    var archRows = [
+      ["Frontend", "Next.js 16 + React 19 + shadcn/ui", "Dashboard UI, charts, transcript viewer"],
+      ["Charts", "Recharts", "Trend lines, pie charts, data visualization"],
+      ["API", "Next.js API Routes", "Data fetching with automatic mock fallback"],
+      ["AI / ML", "Snowflake Cortex AI", "COMPLETE, SENTIMENT, SUMMARIZE, CLASSIFY_TEXT, EXTRACT_ANSWER, EMBED_TEXT_768"],
+      ["Compute", "Snowflake Warehouse", "Query execution and Cortex function processing"],
+      ["Storage", "Snowflake Tables / Views", "Call transcripts, trend summaries, driver analysis"]
+    ];
+
+    var deploySteps = [
+      ["Clone & Run", "Clone the repository and run npm install && npm run dev. The application starts immediately with built-in mock data — no Snowflake account needed."],
+      ["Create Database", "Open a Snowsight SQL Worksheet and execute sql/setup.sql to create the database, schema, and warehouse."],
+      ["Load Data", "Populate the CALL_TRANSCRIPTS table with your call center data. See the README for the expected schema."],
+      ["Configure Auth", "Generate an RSA key pair for secure authentication. Set the public key on your Snowflake user and configure .env.local."],
+      ["Go Live", "Restart the application. It auto-detects your Snowflake connection and switches from mock data to live analytics."]
+    ];
+
+    var features = [
+      { cat: "ai",  icon: "\u26A1",  title: "AI Executive Summaries",    desc: "One-click generation of executive summaries with key findings and recommendations via Cortex COMPLETE.",  tag: "Cortex AI",   tagBg: "rgba(217,26,140,0.1)", tagColor: "#D91A8C" },
+      { cat: "ai",  icon: "\uD83D\uDCC8", title: "Sentiment Analysis",       desc: "Per-call and aggregate sentiment scoring from -1 to +1 using Cortex SENTIMENT.",                       tag: "Cortex AI",   tagBg: "rgba(0,201,167,0.1)",  tagColor: "#00C9A7" },
+      { cat: "ai",  icon: "\uD83D\uDCDD", title: "Transcript Summarization", desc: "Automatic concise summaries of full call transcripts displayed alongside the original text.",         tag: "Cortex AI",   tagBg: "rgba(124,77,255,0.1)", tagColor: "#7C4DFF" },
+      { cat: "ai",  icon: "\uD83C\uDFF7\uFE0F", title: "Call Classification",     desc: "Automatic categorization of calls into contact drivers and escalation detection.",                    tag: "Cortex AI",   tagBg: "rgba(255,184,0,0.1)",  tagColor: "#FFB800" },
+      { cat: "ai",  icon: "\uD83D\uDD0D", title: "Answer Extraction",        desc: "Pull structured answers from unstructured transcripts — issues, resolutions, and action items.",        tag: "Cortex AI",   tagBg: "rgba(255,82,82,0.1)",  tagColor: "#FF5252" },
+      { cat: "ai",  icon: "\uD83E\uDDE0", title: "Vector Embeddings",        desc: "768-dimension embeddings for semantic search across your transcript corpus.",                           tag: "Cortex AI",   tagBg: "rgba(41,181,232,0.1)", tagColor: "#29B5E8" },
+      { cat: "viz", icon: "\uD83D\uDCC9", title: "Trend Analysis",           desc: "13-week rolling charts of call volume, sentiment, escalation rates, and average duration.",             tag: "Visualization", tagBg: "rgba(124,77,255,0.1)", tagColor: "#7C4DFF" },
+      { cat: "viz", icon: "\uD83E\uDE69", title: "Driver Breakdown",         desc: "Interactive table of top contact drivers segmented by LOB, product, segment, and caller type.",          tag: "Visualization", tagBg: "rgba(0,201,167,0.1)",  tagColor: "#00C9A7" },
+      { cat: "viz", icon: "\uD83C\uDF55", title: "Distribution Charts",      desc: "Pie chart breakdowns by line of business with click-to-drill interaction.",                             tag: "Visualization", tagBg: "rgba(217,26,140,0.1)", tagColor: "#D91A8C" },
+      { cat: "viz", icon: "\uD83D\uDCCA", title: "KPI Dashboard",            desc: "Four real-time metric cards: total calls, average sentiment, escalation count, and average duration.",  tag: "Visualization", tagBg: "rgba(255,184,0,0.1)",  tagColor: "#FFB800" },
+      { cat: "analytics", icon: "\uD83D\uDCDE", title: "Transcript Explorer",   desc: "Full-screen modal to browse call transcripts with AI summaries, sentiment badges, and metadata.",   tag: "Analytics", tagBg: "rgba(41,181,232,0.1)", tagColor: "#29B5E8" },
+      { cat: "analytics", icon: "\uD83D\uDD0E", title: "Segment Filtering",     desc: "Filter all views by line of business and customer segment with real-time updates.",                  tag: "Analytics", tagBg: "rgba(255,82,82,0.1)",  tagColor: "#FF5252" },
+      { cat: "analytics", icon: "\u231A",  title: "Timeframe Selection",    desc: "Generate insights for different periods — weekly, monthly, or quarterly analysis windows.",             tag: "Analytics", tagBg: "rgba(124,77,255,0.1)", tagColor: "#7C4DFF" },
+      { cat: "ux",  icon: "\uD83C\uDFA8", title: "Interactive Cortex Badges", desc: "Hover over any Cortex badge to see the exact SQL function being used with a live example.",             tag: "UX", tagBg: "rgba(217,26,140,0.1)", tagColor: "#D91A8C" },
+      { cat: "ux",  icon: "\uD83D\uDCF1", title: "Responsive Design",        desc: "Full mobile support with adaptive layouts from 320px to 1440px+.",                                      tag: "UX", tagBg: "rgba(0,201,167,0.1)",  tagColor: "#00C9A7" },
+      { cat: "ux",  icon: "\uD83D\uDD04", title: "Mock Data Fallback",       desc: "Runs instantly with realistic built-in data. Auto-detects Snowflake and switches seamlessly.",           tag: "UX", tagBg: "rgba(255,184,0,0.1)",  tagColor: "#FFB800" }
+    ];
+
+    // ── Render Architecture Table ──
+    (function() {
+      var tbody = document.getElementById("arch-table");
+      archRows.forEach(function(r) {
+        var tr = document.createElement("tr");
+        tr.style.borderBottom = "1px solid var(--border)";
+        r.forEach(function(cell, i) {
+          var td = document.createElement("td");
+          td.style.padding = "12px 16px";
+          if (i === 0) td.style.fontWeight = "600";
+          td.textContent = cell;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    })();
+
+    // ── Render Deploy Steps ──
+    (function() {
+      var container = document.getElementById("deploy-steps");
+      deploySteps.forEach(function(s, i) {
+        var div = document.createElement("div");
+        div.className = "deploy-step";
+        var num = document.createElement("div");
+        num.className = "deploy-num";
+        num.textContent = i + 1;
+        var content = document.createElement("div");
+        var h3 = document.createElement("h3");
+        h3.textContent = s[0];
+        var p = document.createElement("p");
+        p.textContent = s[1];
+        content.appendChild(h3);
+        content.appendChild(p);
+        div.appendChild(num);
+        div.appendChild(content);
+        container.appendChild(div);
+      });
+    })();
+
+    // ── Render Features ──
+    (function() {
+      var cats = ["all", "ai", "viz", "analytics", "ux"];
+      var catLabels = { all: "All", ai: "Cortex AI", viz: "Visualization", analytics: "Analytics", ux: "UX" };
+      var tabsEl = document.getElementById("filter-tabs");
+      var gridEl = document.getElementById("features-grid");
+
+      cats.forEach(function(c) {
+        var btn = document.createElement("button");
+        btn.className = "filter-tab" + (c === "all" ? " active" : "");
+        btn.textContent = catLabels[c];
+        btn.setAttribute("role", "tab");
+        btn.setAttribute("aria-selected", c === "all" ? "true" : "false");
+        btn.setAttribute("data-cat", c);
+        btn.addEventListener("click", function() {
+          tabsEl.querySelectorAll(".filter-tab").forEach(function(t) {
+            t.classList.remove("active");
+            t.setAttribute("aria-selected", "false");
+          });
+          btn.classList.add("active");
+          btn.setAttribute("aria-selected", "true");
+          gridEl.querySelectorAll(".feature-card").forEach(function(card) {
+            card.hidden = c !== "all" && card.getAttribute("data-cat") !== c;
+          });
+        });
+        tabsEl.appendChild(btn);
+      });
+
+      features.forEach(function(f) {
+        var card = document.createElement("div");
+        card.className = "feature-card";
+        card.setAttribute("data-cat", f.cat);
+        var iconDiv = document.createElement("div");
+        iconDiv.className = "feature-icon";
+        iconDiv.style.background = f.tagBg;
+        iconDiv.textContent = f.icon;
+        var h3 = document.createElement("h3");
+        h3.textContent = f.title;
+        var p = document.createElement("p");
+        p.textContent = f.desc;
+        var tag = document.createElement("span");
+        tag.className = "feature-tag";
+        tag.style.background = f.tagBg;
+        tag.style.color = f.tagColor;
+        tag.textContent = f.tag;
+        card.appendChild(iconDiv);
+        card.appendChild(h3);
+        card.appendChild(p);
+        card.appendChild(tag);
+        gridEl.appendChild(card);
+      });
+    })();
+
+    // ── Hamburger Menu ──
+    (function() {
+      var btn = document.querySelector(".nav-hamburger");
+      var links = document.querySelector(".nav-links");
+      btn.addEventListener("click", function() {
+        var open = btn.classList.toggle("open");
+        links.classList.toggle("open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      links.querySelectorAll("a").forEach(function(a) {
+        a.addEventListener("click", function() {
+          btn.classList.remove("open");
+          links.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+        });
+      });
+    })();
+
+    // ── Nav Scroll Shadow ──
+    (function() {
+      var nav = document.getElementById("navbar");
+      window.addEventListener("scroll", function() {
+        nav.classList.toggle("scrolled", window.scrollY > 10);
+      }, { passive: true });
+    })();
+
+    // ── Reveal on Scroll ──
+    (function() {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+          if (e.isIntersecting) {
+            e.target.classList.add("visible");
+            observer.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: "0px 0px -40px 0px" });
+      document.querySelectorAll(".reveal").forEach(function(el) { observer.observe(el); });
+    })();
+  </script>
+</body>
+</html>
