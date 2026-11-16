@@ -1,84 +1,81 @@
+// Live mode: Snowflake connection and queries (server only).
+// No fallback to sample data: if a live call fails, the error is returned to the app and shown.
 import snowflake from "snowflake-sdk";
 import fs from "fs";
-import type { DataSource, DriverRow, LobSummaryRow, SegmentRow, Transcript, TrendRow } from "./contact-data";
-import { mockSource } from "./mock-source";
+import {
+  insightPrompt, type DataSource, type DriverRow, type Insight, type InsightStats, type LobSummaryRow,
+  type ReasonSummaryRow, type SegmentRow, type Transcript, type TrendRow,
+} from "./contact-data";
 
 snowflake.configure({ logLevel: "ERROR" });
+
+export const CORTEX_MODEL = process.env.CORTEX_MODEL || "llama3.3-70b";
+const SPCS_TOKEN_PATH = "/snowflake/session/token";
 
 let connection: snowflake.Connection | null = null;
 let cachedToken: string | null = null;
 
 function getOAuthToken(): string | null {
-  const tokenPath = "/snowflake/session/token";
   try {
-    if (fs.existsSync(tokenPath)) {
-      return fs.readFileSync(tokenPath, "utf8");
-    }
+    if (fs.existsSync(SPCS_TOKEN_PATH)) return fs.readFileSync(SPCS_TOKEN_PATH, "utf8");
   } catch {
-    // Not in SPCS environment
+    // Not running in Snowpark Container Services
   }
   return null;
 }
 
+/** True when the server has enough settings to try a live connection. Never exposes values. */
+export function isConfigured(): boolean {
+  if (getOAuthToken()) return true;
+  const env = process.env;
+  return Boolean(env.SNOWFLAKE_ACCOUNT && env.SNOWFLAKE_USER
+    && (env.SNOWFLAKE_PRIVATE_KEY_PATH || env.SNOWFLAKE_PASSWORD || env.SNOWFLAKE_AUTHENTICATOR?.toUpperCase() === "EXTERNALBROWSER"));
+}
+
 function getConfig(): snowflake.ConnectionOptions {
+  const env = process.env;
   const base = {
-    account: process.env.SNOWFLAKE_ACCOUNT || "",
-    warehouse: process.env.SNOWFLAKE_WAREHOUSE || "COMPUTE_WH",
-    database: process.env.SNOWFLAKE_DATABASE || "CONTACT_ANALYTICS",
-    schema: process.env.SNOWFLAKE_SCHEMA || "ANALYTICS",
-    role: process.env.SNOWFLAKE_ROLE || "SYSADMIN",
+    account: env.SNOWFLAKE_ACCOUNT || "",
+    warehouse: env.SNOWFLAKE_WAREHOUSE || "CONTACT_DRIVER_WH",
+    database: env.SNOWFLAKE_DATABASE || "CONTACT_DRIVER_EXAMPLE",
+    schema: env.SNOWFLAKE_SCHEMA || "ANALYTICS",
+    role: env.SNOWFLAKE_ROLE || "CONTACT_DRIVER_ROLE",
   };
 
   const token = getOAuthToken();
-  if (token) {
+  if (token) return { ...base, host: env.SNOWFLAKE_HOST, token, authenticator: "OAUTH" };
+
+  // Key-pair (recommended): SNOWFLAKE_JWT with an unencrypted or passphrase-protected PKCS#8 key.
+  if (env.SNOWFLAKE_PRIVATE_KEY_PATH) {
     return {
       ...base,
-      host: process.env.SNOWFLAKE_HOST,
-      token,
-      authenticator: "oauth",
+      username: env.SNOWFLAKE_USER || "",
+      authenticator: "SNOWFLAKE_JWT",
+      privateKey: fs.readFileSync(env.SNOWFLAKE_PRIVATE_KEY_PATH, "utf8"),
+      ...(env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE ? { privateKeyPass: env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE } : {}),
     };
   }
-
-  if (process.env.SNOWFLAKE_PASSWORD) {
-    return {
-      ...base,
-      username: process.env.SNOWFLAKE_USER || "",
-      password: process.env.SNOWFLAKE_PASSWORD,
-    };
+  if (env.SNOWFLAKE_PASSWORD) {
+    return { ...base, username: env.SNOWFLAKE_USER || "", password: env.SNOWFLAKE_PASSWORD };
   }
-
-  return {
-    ...base,
-    username: process.env.SNOWFLAKE_USER || "",
-    authenticator: "EXTERNALBROWSER",
-  };
+  return { ...base, username: env.SNOWFLAKE_USER || "", authenticator: "EXTERNALBROWSER" };
 }
 
 async function getConnection(): Promise<snowflake.Connection> {
   const token = getOAuthToken();
-
-  if (connection && (!token || token === cachedToken)) {
-    return connection;
-  }
-
-  if (connection) {
-    console.log("OAuth token changed, reconnecting");
-    connection.destroy(() => {});
-  }
+  if (connection && (!token || token === cachedToken)) return connection;
+  if (connection) connection.destroy(() => {});
 
   const config = getConfig();
-  console.log(token ? "Connecting with OAuth token" : `Connecting to Snowflake (${config.authenticator || "password"})`);
   const conn = snowflake.createConnection(config);
-  
+  const connect = (cb: (err: snowflake.SnowflakeError | undefined) => void) =>
+    config.authenticator === "EXTERNALBROWSER" ? conn.connectAsync(cb) : conn.connect(cb);
   return new Promise((resolve, reject) => {
-    conn.connect((err) => {
-      if (err) {
-        reject(err);
-      } else {
-        connection = conn;
-        cachedToken = token;
-        resolve(conn);
-      }
+    connect((err) => {
+      if (err) return reject(err);
+      connection = conn;
+      cachedToken = token;
+      resolve(conn);
     });
   });
 }
@@ -92,7 +89,7 @@ function isRetryableError(err: unknown): boolean {
   );
 }
 
-type Bind = string | number | boolean;
+type Bind = string | number | boolean | null;
 
 export async function query<T>(sql: string, binds: Bind[] = [], retries = 1): Promise<T[]> {
   try {
@@ -100,18 +97,11 @@ export async function query<T>(sql: string, binds: Bind[] = [], retries = 1): Pr
     return await new Promise<T[]>((resolve, reject) => {
       conn.execute({
         sqlText: sql,
-        binds,
-        complete: (err, stmt, rows) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve((rows || []) as T[]);
-          }
-        },
+        binds: binds as snowflake.Binds,
+        complete: (err, _stmt, rows) => (err ? reject(err) : resolve((rows || []) as T[])),
       });
     });
   } catch (err) {
-    console.error("Query error:", (err as Error).message);
     if (retries > 0 && isRetryableError(err)) {
       connection = null;
       return query(sql, binds, retries - 1);
@@ -120,96 +110,100 @@ export async function query<T>(sql: string, binds: Bind[] = [], retries = 1): Pr
   }
 }
 
-// Request values reach SQL as bind variables. The one exception, LIMIT, is an integer clamped by parseTranscriptFilters.
-const snowflakeSource: DataSource = {
+// Windows are relative to the latest call, matching the sample data.
+const LATEST = "(SELECT MAX(CALL_DATE) FROM CALL_TRANSCRIPTS)";
+const WEEK_OF = "DATEADD(day, 1 - DAYOFWEEKISO(CALL_DATE), CALL_DATE)";
+
+// Request values reach SQL only as bind variables. The one exception, LIMIT, is an integer clamped by parseTranscriptFilters.
+export const snowflakeSource: DataSource = {
   trends: () => query<TrendRow>(`
-    SELECT * FROM CONTACT_ANALYTICS.ANALYTICS.V_TREND_SUMMARY
+    SELECT TO_VARCHAR(WEEK_START, 'YYYY-MM-DD') AS WEEK_START, TOTAL_CALLS, OVERALL_SENTIMENT,
+           TOTAL_ESCALATIONS, ESCALATION_RATE, AVG_CALL_DURATION_SEC
+    FROM V_TREND_SUMMARY
     ORDER BY WEEK_START DESC
     LIMIT 13
   `),
 
   segmentRows: () => query<SegmentRow>(`
-    SELECT DISTINCT line_of_business, product_category, customer_segment
-    FROM CONTACT_ANALYTICS.ANALYTICS.CALL_TRANSCRIPTS
+    SELECT DISTINCT LINE_OF_BUSINESS, PRODUCT_CATEGORY, CUSTOMER_SEGMENT FROM CALL_TRANSCRIPTS
   `),
 
   drivers: ({ lob, segment }) => query<DriverRow>(`
-    SELECT
-      line_of_business,
-      product_category,
-      customer_segment,
-      caller_type,
-      SUM(call_volume) as call_volume,
-      AVG(avg_duration) as avg_duration,
-      AVG(avg_sentiment) as avg_sentiment,
-      SUM(escalations) as escalations,
-      AVG(resolution_rate) as resolution_rate
-    FROM CONTACT_ANALYTICS.ANALYTICS.V_CALL_DRIVER_ANALYSIS
-    WHERE week_start >= DATEADD(day, -30, CURRENT_DATE())
-      AND (? IS NULL OR line_of_business = ?)
-      AND (? IS NULL OR customer_segment = ?)
-    GROUP BY line_of_business, product_category, customer_segment, caller_type
-    ORDER BY call_volume DESC
-    LIMIT 50
-  `, [lob ?? null, lob ?? null, segment ?? null, segment ?? null] as Bind[]),
+    SELECT LINE_OF_BUSINESS, PRODUCT_CATEGORY, CUSTOMER_SEGMENT, CALLER_TYPE,
+           SUM(CALL_VOLUME)                          AS CALL_VOLUME,
+           SUM(TOTAL_DURATION) / SUM(CALL_VOLUME)    AS AVG_DURATION,
+           SUM(SENTIMENT_SUM) / SUM(CALL_VOLUME)     AS AVG_SENTIMENT,
+           SUM(ESCALATIONS)                          AS ESCALATIONS,
+           SUM(RESOLVED) * 100 / SUM(CALL_VOLUME)    AS RESOLUTION_RATE
+    FROM V_CALL_DRIVER_ANALYSIS
+    WHERE WEEK_START >= DATEADD(day, -30, ${LATEST})
+      AND (? IS NULL OR LINE_OF_BUSINESS = ?)
+      AND (? IS NULL OR CUSTOMER_SEGMENT = ?)
+    GROUP BY ALL
+    ORDER BY CALL_VOLUME DESC, LINE_OF_BUSINESS || '|' || PRODUCT_CATEGORY || '|' || CUSTOMER_SEGMENT || '|' || CALLER_TYPE
+    LIMIT 200
+  `, [lob ?? null, lob ?? null, segment ?? null, segment ?? null]),
 
   lobSummary: (days, lob) => query<LobSummaryRow>(`
-    SELECT
-      line_of_business,
-      SUM(call_volume) as call_volume,
-      AVG(avg_sentiment) as avg_sentiment,
-      SUM(escalations) as escalations
-    FROM CONTACT_ANALYTICS.ANALYTICS.V_CALL_DRIVER_ANALYSIS
-    WHERE week_start >= DATEADD(day, ?, CURRENT_DATE())
-      AND (? IS NULL OR line_of_business = ?)
-    GROUP BY line_of_business
-    ORDER BY call_volume DESC
-  `, [-days, lob ?? null, lob ?? null] as Bind[]),
+    SELECT LINE_OF_BUSINESS,
+           SUM(CALL_VOLUME)                      AS CALL_VOLUME,
+           SUM(SENTIMENT_SUM) / SUM(CALL_VOLUME) AS AVG_SENTIMENT,
+           SUM(ESCALATIONS)                      AS ESCALATIONS
+    FROM V_CALL_DRIVER_ANALYSIS
+    WHERE WEEK_START >= DATEADD(day, ?, ${LATEST})
+      AND (? IS NULL OR LINE_OF_BUSINESS = ?)
+    GROUP BY LINE_OF_BUSINESS
+    ORDER BY CALL_VOLUME DESC, LINE_OF_BUSINESS
+  `, [-days, lob ?? null, lob ?? null]),
+
+  reasonSummary: (days, lob) => query<ReasonSummaryRow>(`
+    SELECT CALL_REASON,
+           COUNT(*)              AS CALL_VOLUME,
+           COUNT_IF(ESCALATED)   AS ESCALATIONS,
+           AVG(SENTIMENT_SCORE)  AS AVG_SENTIMENT
+    FROM CALL_TRANSCRIPTS
+    WHERE ${WEEK_OF} >= DATEADD(day, ?, ${LATEST})
+      AND (? IS NULL OR LINE_OF_BUSINESS = ?)
+    GROUP BY CALL_REASON
+    ORDER BY CALL_VOLUME DESC, CALL_REASON
+  `, [-days, lob ?? null, lob ?? null]),
 
   transcripts: ({ lob, segment, week, escalated, limit }) => query<Transcript>(`
-    SELECT
-      CALL_ID,
-      CALL_DATE,
-      CALL_TIME,
-      DURATION_SECONDS,
-      LINE_OF_BUSINESS,
-      CALL_DISPOSITION,
-      CALL_REASON,
-      CUSTOMER_SEGMENT,
-      TRANSCRIPT,
-      SENTIMENT_SCORE,
-      ESCALATED
-    FROM CONTACT_ANALYTICS.ANALYTICS.CALL_TRANSCRIPTS
+    SELECT CALL_ID,
+           TO_VARCHAR(CALL_DATE, 'YYYY-MM-DD') AS CALL_DATE,
+           TO_VARCHAR(CALL_TIME, 'HH24:MI:SS') AS CALL_TIME,
+           DURATION_SECONDS, LINE_OF_BUSINESS, CALL_DISPOSITION, CALL_REASON, CUSTOMER_SEGMENT,
+           TRANSCRIPT, SENTIMENT_SCORE, AI_SUMMARY, AI_DRIVER, ESCALATED
+    FROM CALL_TRANSCRIPTS
     WHERE (? IS NULL OR LINE_OF_BUSINESS = ?)
       AND (? IS NULL OR CUSTOMER_SEGMENT = ?)
-      AND (? IS NULL OR DATE_TRUNC('week', CALL_DATE) = TO_DATE(?))
+      AND (? IS NULL OR ${WEEK_OF} = TO_DATE(?))
       AND (? = FALSE OR ESCALATED = TRUE)
-    ORDER BY CALL_DATE DESC, CALL_TIME DESC
+    ORDER BY CALL_DATE DESC, CALL_TIME DESC, CALL_ID DESC
     LIMIT ${Math.trunc(limit)}
-  `, [lob ?? null, lob ?? null, segment ?? null, segment ?? null, week ?? null, week ?? null, Boolean(escalated)] as Bind[]),
+  `, [lob ?? null, lob ?? null, segment ?? null, segment ?? null, week ?? null, week ?? null, Boolean(escalated)]),
 };
 
-// Uses Snowflake when it is reachable; otherwise (USE_MOCK_DATA=true or a connection error) the built-in sample data.
-type Method = (...args: never[]) => Promise<unknown>;
-
-function withFallback<K extends keyof DataSource>(key: K): DataSource[K] {
-  const live = snowflakeSource[key] as unknown as Method;
-  const sample = mockSource[key] as unknown as Method;
-  return (async (...args: never[]) => {
-    if (process.env.USE_MOCK_DATA === "true") return sample(...args);
-    try {
-      return await live(...args);
-    } catch {
-      console.log("Falling back to sample data due to connection error");
-      return sample(...args);
-    }
-  }) as unknown as DataSource[K];
+/** Executive summary, findings, and recommendations from AI_COMPLETE over the aggregated stats. */
+export async function liveInsight(stats: InsightStats): Promise<Insight> {
+  const started = Date.now();
+  const [row] = await query<{ R: string | { summary?: string; key_findings?: string[]; recommendations?: string[] } }>(`
+    SELECT AI_COMPLETE(
+      model => ?,
+      prompt => ?,
+      model_parameters => {'temperature': 0, 'max_tokens': 900},
+      response_format => TYPE OBJECT(summary STRING, key_findings ARRAY(STRING), recommendations ARRAY(STRING))
+    ) AS R
+  `, [CORTEX_MODEL, insightPrompt(stats)]);
+  const r = typeof row?.R === "string" ? JSON.parse(row.R) : row?.R;
+  if (!r?.summary) throw new Error("AI_COMPLETE returned no summary");
+  return {
+    source: "live",
+    model: CORTEX_MODEL,
+    latencyMs: Date.now() - started,
+    metrics: stats.metrics,
+    summary: r.summary,
+    keyFindings: r.key_findings ?? [],
+    recommendations: r.recommendations ?? [],
+  };
 }
-
-export const dataSource: DataSource = {
-  trends: withFallback("trends"),
-  segmentRows: withFallback("segmentRows"),
-  drivers: withFallback("drivers"),
-  lobSummary: withFallback("lobSummary"),
-  transcripts: withFallback("transcripts"),
-};

@@ -5,8 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CortexBadge } from "@/components/ui/cortex-badge";
-import { HOSTED_EXAMPLE, fetchTranscripts as loadTranscripts } from "@/lib/api-client";
+import { AiBadge } from "@/components/ui/cortex-badge";
+import { fetchTranscripts as loadTranscripts } from "@/lib/api-client";
+import type { Transcript } from "@/lib/contact-data";
 import { 
   Phone, 
   Clock, 
@@ -19,26 +20,15 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Brain
+  Brain,
+  Tags
 } from "lucide-react";
-
-interface Transcript {
-  CALL_ID: string;
-  CALL_DATE: string;
-  CALL_TIME: string;
-  DURATION_SECONDS: number;
-  LINE_OF_BUSINESS: string;
-  CALL_DISPOSITION: string;
-  CALL_REASON: string;
-  CUSTOMER_SEGMENT: string;
-  TRANSCRIPT: string;
-  SENTIMENT_SCORE: number;
-  ESCALATED: boolean;
-}
 
 interface TranscriptModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Sample mode: show sample labels instead of "Powered by". */
+  sample: boolean;
   filters: {
     lob?: string;
     segment?: string;
@@ -48,19 +38,22 @@ interface TranscriptModalProps {
   };
 }
 
-export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModalProps) {
+export function TranscriptModal({ open, onOpenChange, filters, sample }: TranscriptModalProps) {
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
 
   useEffect(() => {
     if (open) {
       fetchTranscripts();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, filters]);
 
   const fetchTranscripts = async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
       if (filters.lob) params.set("lob", filters.lob);
@@ -71,8 +64,9 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
 
       setTranscripts(await loadTranscripts(params));
       setSelectedTranscript(null);
-    } catch (error) {
-      console.error("Failed to fetch transcripts:", error);
+    } catch (err) {
+      setTranscripts([]);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -85,9 +79,9 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
   };
 
   const getSentimentColor = (score: number) => {
-    if (score >= 0.3) return "text-green-600 bg-green-50";
-    if (score <= -0.3) return "text-red-600 bg-red-50";
-    return "text-yellow-600 bg-yellow-50";
+    if (score >= 0.3) return "text-green-600 bg-green-50 dark:bg-green-950/40 dark:text-green-300";
+    if (score <= -0.3) return "text-red-600 bg-red-50 dark:bg-red-950/40 dark:text-red-300";
+    return "text-yellow-700 bg-yellow-50 dark:bg-yellow-950/40 dark:text-yellow-300";
   };
 
   const getSentimentIcon = (score: number) => {
@@ -102,20 +96,6 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
     return "Neutral";
   };
 
-  const generateCallSummary = (transcript: Transcript) => {
-    const reason = transcript.CALL_REASON;
-    const disposition = transcript.CALL_DISPOSITION;
-    const sentiment = transcript.SENTIMENT_SCORE;
-    const lob = transcript.LINE_OF_BUSINESS;
-    
-    const sentimentDesc = sentiment >= 0.3 ? "positive" : sentiment <= -0.3 ? "negative" : "neutral";
-    const outcomeDesc = disposition === "Resolved" ? "successfully resolved" : 
-                       disposition === "Transferred" ? "transferred to a specialist" :
-                       disposition === "Follow-up Required" ? "requires follow-up action" : "escalated for further review";
-    
-    return `Customer called regarding ${reason.toLowerCase()} for ${lob}. The call was ${outcomeDesc} with an overall ${sentimentDesc} customer sentiment.`;
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] flex flex-col p-0">
@@ -127,7 +107,7 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
                 {filters.title || "Call Transcripts"}
               </DialogTitle>
               <DialogDescription className="mt-1">
-                {HOSTED_EXAMPLE ? "Viewing synthetic sample calls" : "Viewing call data from Snowflake"}
+                {sample ? "Synthetic sample calls (no Snowflake connection used)" : "Synthetic calls from CONTACT_DRIVER_EXAMPLE.ANALYTICS.CALL_TRANSCRIPTS in your Snowflake account"}
               </DialogDescription>
             </div>
             <Badge variant="outline" className="font-mono">
@@ -141,8 +121,13 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                <p className="text-sm text-muted-foreground mt-2">Loading transcripts from Snowflake...</p>
+                <p className="text-sm text-muted-foreground mt-2">{sample ? "Loading sample calls..." : "Loading calls from Snowflake..."}</p>
               </div>
+            </div>
+          ) : error ? (
+            <div role="alert" className="m-6 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+              <p className="font-semibold text-destructive">Live mode: loading calls failed</p>
+              <p className="mt-1 break-words">{error}</p>
             </div>
           ) : (
             <>
@@ -216,7 +201,7 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
                             {selectedTranscript.SENTIMENT_SCORE.toFixed(3)}
                           </p>
                           <p className="text-[10px] text-center opacity-70">
-                            via CORTEX.SENTIMENT
+                            {sample ? "sample (captured CORTEX.SENTIMENT)" : "via SNOWFLAKE.CORTEX.SENTIMENT"}
                           </p>
                         </div>
                       </div>
@@ -256,10 +241,14 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
                         </div>
                       </div>
 
-                      <div className="mt-3">
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         <Badge variant="secondary" className="text-xs">
                           {selectedTranscript.CALL_REASON}
                         </Badge>
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Tags className="h-3 w-3" aria-hidden /> AI driver: <strong className="text-foreground">{selectedTranscript.AI_DRIVER}</strong>
+                        </span>
+                        <AiBadge fn="AI_CLASSIFY" sample={sample} />
                       </div>
                     </div>
 
@@ -268,17 +257,16 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
                         <div className="flex items-center gap-2 mb-4">
                           <MessageSquare className="h-5 w-5 text-primary" />
                           <h4 className="font-semibold">Call Transcript</h4>
-                          <CortexBadge function="SUMMARIZE" size="sm" tooltipPosition="bottom" />
                         </div>
                         
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                          <div className="flex items-center gap-2 mb-2">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 dark:bg-blue-950/30 dark:border-blue-900">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
                             <Brain className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-800">AI Summary</span>
-                            <span className="text-[10px] text-blue-600">via CORTEX.SUMMARIZE</span>
+                            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">AI Summary</span>
+                            <AiBadge fn="AI_COMPLETE" sample={sample} />
                           </div>
-                          <p className="text-sm text-blue-900">
-                            {generateCallSummary(selectedTranscript)}
+                          <p className="text-sm text-blue-900 dark:text-blue-100">
+                            {selectedTranscript.AI_SUMMARY}
                           </p>
                         </div>
 
@@ -286,7 +274,7 @@ export function TranscriptModal({ open, onOpenChange, filters }: TranscriptModal
                           {selectedTranscript.TRANSCRIPT}
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                          Transcript analyzed using SNOWFLAKE.CORTEX.SENTIMENT() and SNOWFLAKE.CORTEX.SUMMARIZE()
+                          Synthetic transcript. Sentiment, summary, and driver were computed once per transcript template in sql/setup.sql with SNOWFLAKE.CORTEX.SENTIMENT, AI_COMPLETE, and AI_CLASSIFY{sample ? " (captured outputs shown in Sample mode)" : ""}.
                         </p>
                       </div>
                     </div>

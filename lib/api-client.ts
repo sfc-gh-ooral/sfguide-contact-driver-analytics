@@ -1,43 +1,51 @@
-// Client-side data access. The hosted example (a static GitHub Pages build) has no server,
-// so it calls the built-in sample data directly; every other build calls the API routes.
+// Client-side data access. Sample mode (and the hosted example, which has no server) uses the
+// built-in sample data in the browser; Live mode calls the API routes, which query Snowflake.
 import {
-  getDrivers, getInsights, getSegments, getTranscripts, getTrends, parseDriverFilters, parseTimeframe, parseTranscriptFilters,
-  type DriverRow, type Insight, type Transcript, type TrendRow,
+  getDrivers, getInsightStats, getSegments, getTranscripts, getTrends, parseDriverFilters, parseTimeframe,
+  parseTranscriptFilters, sampleInsight, type DriverRow, type Insight, type Transcript, type TrendRow,
 } from "./contact-data";
 import { mockSource } from "./mock-source";
+import { getModeState } from "./mode";
 
-export const HOSTED_EXAMPLE = process.env.NEXT_PUBLIC_HOSTED_EXAMPLE === "true";
+export { HOSTED_EXAMPLE } from "./mode";
+
+const isSample = async () => (await getModeState()).mode === "sample";
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
-  if (!res.ok) throw new Error(`${url} failed (${res.status})`);
-  return res.json();
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error ?? `${url} failed (${res.status})`);
+  return body as T;
 }
 
-export function fetchTrends(): Promise<TrendRow[]> {
-  return HOSTED_EXAMPLE ? getTrends(mockSource) : getJson("/api/trends");
+export async function fetchTrends(): Promise<TrendRow[]> {
+  return (await isSample()) ? getTrends(mockSource) : getJson("/api/trends");
 }
 
-export function fetchSegments(): Promise<{ lobs: string[]; segments: string[]; products: string[] }> {
-  return HOSTED_EXAMPLE ? getSegments(mockSource) : getJson("/api/segments");
+export async function fetchSegments(): Promise<{ lobs: string[]; segments: string[]; products: string[] }> {
+  return (await isSample()) ? getSegments(mockSource) : getJson("/api/segments");
 }
 
-export function fetchDrivers(params: URLSearchParams): Promise<DriverRow[]> {
-  if (!HOSTED_EXAMPLE) return getJson(`/api/drivers?${params}`);
-  return getDrivers(mockSource, parseDriverFilters(params));
+export async function fetchDrivers(params: URLSearchParams): Promise<DriverRow[]> {
+  return (await isSample()) ? getDrivers(mockSource, parseDriverFilters(params)) : getJson(`/api/drivers?${params}`);
 }
 
-export function fetchInsights(segment: string, timeframe: string): Promise<Insight> {
-  if (!HOSTED_EXAMPLE) {
-    return getJson("/api/insights", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ segment, timeframe }),
-    });
+/** Sample mode returns scripted text after `sampleDelayMs`; Live mode calls AI_COMPLETE with no added delay. */
+export async function fetchInsights(segment: string, timeframe: string, sampleDelayMs: number): Promise<Insight> {
+  if (await isSample()) {
+    const [insight] = await Promise.all([
+      getInsightStats(mockSource, segment, parseTimeframe(timeframe)).then(sampleInsight),
+      new Promise(resolve => setTimeout(resolve, sampleDelayMs)),
+    ]);
+    return insight;
   }
-  return getInsights(mockSource, segment, parseTimeframe(timeframe));
+  return getJson("/api/insights", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ segment, timeframe }),
+  });
 }
 
-export function fetchTranscripts(params: URLSearchParams): Promise<Transcript[]> {
-  return HOSTED_EXAMPLE ? getTranscripts(mockSource, parseTranscriptFilters(params)) : getJson(`/api/transcripts?${params}`);
+export async function fetchTranscripts(params: URLSearchParams): Promise<Transcript[]> {
+  return (await isSample()) ? getTranscripts(mockSource, parseTranscriptFilters(params)) : getJson(`/api/transcripts?${params}`);
 }

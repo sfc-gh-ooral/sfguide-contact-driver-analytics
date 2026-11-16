@@ -1,14 +1,10 @@
-import { NextResponse } from "next/server";
-import { dataSource } from "@/lib/snowflake";
-import { getInsights, parseTimeframe } from "@/lib/contact-data";
+import { liveInsight, snowflakeSource } from "@/lib/snowflake";
+import { getInsightStats, parseTimeframe } from "@/lib/contact-data";
+import { live } from "@/lib/live-route";
 
+// Aggregates V_CALL_DRIVER_ANALYSIS and CALL_TRANSCRIPTS, then calls AI_COMPLETE on the totals.
 export async function POST(request: Request) {
-  try {
-    const { segment, timeframe } = await request.json();
-    const lob = typeof segment === "string" ? segment : undefined;
-    return NextResponse.json(await getInsights(dataSource, lob, parseTimeframe(timeframe)));
-  } catch (error) {
-    console.error("Insights API error:", error);
-    return NextResponse.json({ error: "Failed to generate insights" }, { status: 500 });
-  }
+  const body = await request.json().catch(() => ({}));
+  const lob = typeof body.segment === "string" ? body.segment : undefined;
+  return live("AI insights", async () => liveInsight(await getInsightStats(snowflakeSource, lob, parseTimeframe(body.timeframe))));
 }

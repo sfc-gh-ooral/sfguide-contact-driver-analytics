@@ -1,12 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { dataSource } from "@/lib/snowflake";
+import { NextRequest } from "next/server";
+import { snowflakeSource } from "@/lib/snowflake";
 import { getTranscripts, parseTranscriptFilters } from "@/lib/contact-data";
+import { live } from "@/lib/live-route";
 
-export async function GET(request: NextRequest) {
-  try {
-    return NextResponse.json(await getTranscripts(dataSource, parseTranscriptFilters(request.nextUrl.searchParams)));
-  } catch (error) {
-    console.error("Error fetching transcripts:", error);
-    return NextResponse.json([]);
-  }
+export function GET(request: NextRequest) {
+  return live("Transcripts", () => getTranscripts(snowflakeSource, parseTranscriptFilters(request.nextUrl.searchParams)));
 }

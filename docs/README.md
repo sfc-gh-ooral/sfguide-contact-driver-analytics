@@ -18,6 +18,9 @@ The page will be available at: `https://<github-org>.github.io/sfguide-contact-d
 | File | Purpose |
 |---|---|
 | `index.html` | Self-contained landing page (inline CSS, inline JS, no external dependencies) |
+| `images/` | Landing-page screenshots (`npm run capture`) |
+| `catalog/` | 960×600 Snow Packs card images |
+| `try/` | Hosted Sample-mode example (`npm run build:example`) |
 | `.nojekyll` | Prevents Jekyll processing (ensures files starting with `_` are served) |
 | `README.md` | This file |
 

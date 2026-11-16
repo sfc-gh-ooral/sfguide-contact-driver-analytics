@@ -9,11 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { CortexBadge, CortexInfoPanel } from "@/components/ui/cortex-badge";
+import { AiBadge, PoweredBy, SampleBadge } from "@/components/ui/cortex-badge";
 import { TranscriptModal } from "@/components/transcript-modal";
+import { ModeChip } from "@/components/ModeChip";
+import { INSIGHT_STEPS, Reasoning, sampleDelayMs } from "@/components/Reasoning";
 import { HOSTED_EXAMPLE, fetchDrivers as loadDrivers, fetchInsights, fetchSegments, fetchTrends } from "@/lib/api-client";
+import { getModeState, type ModeState } from "@/lib/mode";
+import type { Insight } from "@/lib/contact-data";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
-import { Phone, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Sparkles, Mail, RefreshCw, Info, Brain, Zap, Database, ExternalLink, Clock } from "lucide-react";
+import { Phone, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Sparkles, RefreshCw, Info, Brain, Zap, Database, ExternalLink, Clock } from "lucide-react";
 
 interface TrendData {
   WEEK_START: string;
@@ -36,19 +40,6 @@ interface DriverData {
   RESOLUTION_RATE: number;
 }
 
-interface Insight {
-  summary: string;
-  keyFindings: string[];
-  recommendations: string[];
-  cortexFunctions?: string[];
-  metrics: {
-    totalCalls: number;
-    avgSentiment: string;
-    escalationRate: string;
-    topDriver: string;
-  };
-}
-
 interface TranscriptFilters {
   lob?: string;
   segment?: string;
@@ -67,26 +58,25 @@ export default function Dashboard() {
   const [timeframe, setTimeframe] = useState("month");
   const [loading, setLoading] = useState(true);
   const [insightLoading, setInsightLoading] = useState(false);
+  const [insightExpectedMs, setInsightExpectedMs] = useState(6000);
+  const [insightError, setInsightError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ModeState>();
   const [transcriptModalOpen, setTranscriptModalOpen] = useState(false);
   const [transcriptFilters, setTranscriptFilters] = useState<TranscriptFilters>({});
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    fetchDrivers();
-  }, [selectedLob, selectedSegment]);
+  const sample = mode?.mode !== "live";
+  const model = mode?.model ?? "llama3.3-70b";
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [trendsData, segmentsData] = await Promise.all([fetchTrends(), fetchSegments()]);
       setTrends(trendsData);
       setSegments(segmentsData);
       await fetchDrivers();
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
+    } catch (err) {
+      setError((err as Error).message);
     }
     setLoading(false);
   };
@@ -97,18 +87,33 @@ export default function Dashboard() {
       if (selectedLob !== "all") params.set("lob", selectedLob);
       if (selectedSegment !== "all") params.set("segment", selectedSegment);
       setDrivers(await loadDrivers(params));
-    } catch (error) {
-      console.error("Failed to fetch drivers:", error);
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
+  useEffect(() => {
+    getModeState().then(setMode);
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetchDrivers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLob, selectedSegment]);
+
   const generateInsights = async () => {
+    // Sample mode waits 4-8 s; Live mode has no added delay (the steps advance on a typical ~12 s latency).
+    const delay = sampleDelayMs();
+    setInsightExpectedMs(sample ? delay : 12000);
     setInsightLoading(true);
+    setInsightError(null);
+    setInsight(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      setInsight(await fetchInsights(selectedLob, timeframe));
-    } catch (error) {
-      console.error("Failed to generate insights:", error);
+      setInsight(await fetchInsights(selectedLob, timeframe, delay));
+    } catch (err) {
+      setInsightError((err as Error).message);
     }
     setInsightLoading(false);
   };
@@ -130,6 +135,7 @@ export default function Dashboard() {
 
   const pieData = Object.entries(lobDistribution).map(([name, value]) => ({ name, value }));
   const COLORS = ["#e91e8c", "#00d4aa", "#ffb800", "#7c4dff", "#ff5252"];
+  const sentimentClass = (s: number) => (s >= 0.3 ? "text-accent" : s < 0 ? "text-destructive" : "");
 
   if (loading) {
     return (
@@ -156,17 +162,12 @@ export default function Dashboard() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold tracking-tight">Contact Driver Analytics</h1>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Powered by</span>
-                  <Badge variant="outline" className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-xs px-2 py-0 font-medium gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    Snowflake Cortex AI
-                  </Badge>
-                </div>
+                <p className="text-xs text-muted-foreground">Northwind Financial (fictional) · synthetic data</p>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <ModeChip />
             <Select value={selectedLob} onValueChange={setSelectedLob}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Line of Business" />
@@ -189,26 +190,32 @@ export default function Dashboard() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={fetchData}>
+            <Button variant="outline" size="icon" onClick={fetchData} aria-label="Reload data">
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
 
-      {HOSTED_EXAMPLE && (
+      {mode && sample && (
         <div role="note" className="border-b bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           <div className="max-w-7xl mx-auto px-6 py-2 text-xs flex flex-wrap items-center gap-x-2 gap-y-1">
             <Info className="h-3.5 w-3.5" aria-hidden="true" />
-            <strong>Sample data mode.</strong>
-            <span>Runs entirely in your browser on synthetic data; no Snowflake account needed. AI insights are template text, not live Cortex output.</span>
-            <a className="underline underline-offset-2 font-medium" href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics">Run it in your own account</a>
+            <strong>Sample mode.</strong>
+            <span>Runs in your browser on synthetic data; no Snowflake account needed. Sentiment, call summaries, and driver labels were captured from a live Cortex run; AI insights are scripted samples.</span>
+            <a className="underline underline-offset-2 font-medium" href="https://github.com/sfc-gh-ooral/sfguide-contact-driver-analytics#live-mode-run-it-in-your-account">Run it in your own account</a>
           </div>
         </div>
       )}
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        <CortexInfoPanel />
+        {error && (
+          <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+            <p className="font-semibold text-destructive">Live mode: a Snowflake call failed</p>
+            <p className="mt-1 break-words">{error}</p>
+            <p className="mt-1 text-muted-foreground">No sample data was substituted. Fix the connection or switch to Sample in the header.</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card 
@@ -221,7 +228,7 @@ export default function Dashboard() {
           >
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
-                <Phone className="h-4 w-4" /> Total Calls
+                <Phone className="h-4 w-4" /> Calls (latest week)
               </CardDescription>
               <CardTitle className="text-3xl font-bold">
                 {latestTrend?.TOTAL_CALLS?.toLocaleString() || "—"}
@@ -248,7 +255,7 @@ export default function Dashboard() {
             })}
           >
             <div className="absolute top-2 right-2 z-10">
-              <CortexBadge function="SENTIMENT" size="sm" />
+              <AiBadge fn="SENTIMENT" sample={sample} sampleLabel="Sample data" />
             </div>
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
@@ -261,7 +268,7 @@ export default function Dashboard() {
             <CardContent>
               <div className={`flex items-center text-sm ${sentimentTrend >= 0 ? "text-accent" : "text-destructive"}`}>
                 {sentimentTrend >= 0 ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
-                {sentimentTrend >= 0 ? "+" : ""}{(sentimentTrend * 100).toFixed(1)}%
+                {sentimentTrend >= 0 ? "+" : ""}{sentimentTrend.toFixed(2)} vs last week (-1 to 1 scale)
               </div>
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <ExternalLink className="h-3 w-3" />
@@ -279,9 +286,6 @@ export default function Dashboard() {
               title: "Escalated Calls" + (selectedLob !== "all" ? ` - ${selectedLob}` : "")
             })}
           >
-            <div className="absolute top-2 right-2 z-10">
-              <CortexBadge function="CLASSIFY" size="sm" />
-            </div>
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" /> Escalations
@@ -344,29 +348,30 @@ export default function Dashboard() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={{ calls: { label: "Calls", color: "hsl(var(--chart-1))" } }} className="h-72">
+                  <ChartContainer config={{ calls: { label: "Calls", color: "var(--chart-1)" } }} className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trends}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="WEEK_START" tick={{ fontSize: 12 }} tickFormatter={(v) => new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric" })} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="WEEK_START" tick={{ fontSize: 12 }} tickFormatter={(v) => new Date(`${v}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} />
                         <YAxis tick={{ fontSize: 12 }} />
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Line 
                           type="monotone" 
                           dataKey="TOTAL_CALLS" 
-                          stroke="hsl(var(--chart-1))" 
+                          stroke="var(--chart-1)" 
                           strokeWidth={2} 
-                          dot={{ fill: "hsl(var(--chart-1))", cursor: "pointer" }}
+                          dot={{ fill: "var(--chart-1)", cursor: "pointer" }}
                           activeDot={{
                             r: 8,
                             cursor: "pointer",
-                            onClick: (e: any, payload: any) => {
-                              if (payload?.payload?.WEEK_START) {
+                            onClick: (_e: unknown, payload: unknown) => {
+                              const p = payload as { payload?: { WEEK_START?: string } };
+                              if (p?.payload?.WEEK_START) {
                                 openTranscriptModal({
-                                  week: payload.payload.WEEK_START,
+                                  week: p.payload.WEEK_START,
                                   lob: selectedLob,
                                   segment: selectedSegment,
-                                  title: `Calls for week of ${new Date(payload.payload.WEEK_START).toLocaleDateString()}`
+                                  title: `Calls for week of ${p.payload.WEEK_START}`
                                 });
                               }
                             }
@@ -383,9 +388,8 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle>Distribution by LOB</CardTitle>
-                      <CardDescription>Click a segment to drill down</CardDescription>
+                      <CardDescription>Last 4 weeks · click a segment to drill down</CardDescription>
                     </div>
-                    <CortexBadge function="CLASSIFY" />
                   </div>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center">
@@ -428,12 +432,9 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Top Contact Drivers</CardTitle>
-                    <CardDescription>Click any row to view individual call transcripts</CardDescription>
+                    <CardDescription>Last 4 weeks, by line of business, product, segment, and caller · click any row to view its calls</CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <CortexBadge function="SENTIMENT" />
-                    <CortexBadge function="CLASSIFY" />
-                  </div>
+                  <AiBadge fn="SENTIMENT" sample={sample} sampleLabel="Sample data" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -473,7 +474,7 @@ export default function Dashboard() {
                         <TableCell>{d.CALLER_TYPE}</TableCell>
                         <TableCell className="text-right">{d.CALL_VOLUME?.toLocaleString()}</TableCell>
                         <TableCell className="text-right">
-                          <span className={d.AVG_SENTIMENT > 0.6 ? "text-accent" : d.AVG_SENTIMENT < 0.4 ? "text-destructive" : ""}>
+                          <span className={sentimentClass(d.AVG_SENTIMENT)}>
                             {d.AVG_SENTIMENT?.toFixed(2)}
                           </span>
                         </TableCell>
@@ -495,10 +496,9 @@ export default function Dashboard() {
                       <Brain className="h-5 w-5 text-primary" />
                       AI-Generated Insights
                     </CardTitle>
-                    <CardDescription className="flex items-center gap-2 mt-1">
-                      <span>Analysis powered by</span>
-                      <CortexBadge function="COMPLETE" size="sm" />
-                      <span className="text-muted-foreground">using Llama 3.1 70B</span>
+                    <CardDescription className="flex flex-wrap items-center gap-2 mt-1">
+                      <span>Executive summary from aggregated driver stats</span>
+                      {sample ? <SampleBadge /> : <><PoweredBy fn="AI_COMPLETE" /><span className="text-muted-foreground">{model}</span></>}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -520,12 +520,19 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
-                {insight ? (
+                {insightLoading ? (
+                  <Reasoning steps={INSIGHT_STEPS(model)} expectedMs={insightExpectedMs} />
+                ) : insightError ? (
+                  <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+                    <p className="font-semibold text-destructive">The AI_COMPLETE call failed</p>
+                    <p className="mt-1 break-words">{insightError}</p>
+                  </div>
+                ) : insight ? (
                   <div className="space-y-6">
                     <div className="p-4 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-lg border border-primary/10">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
                         <h4 className="font-semibold">Executive Summary</h4>
-                        <CortexBadge function="SUMMARIZE" size="sm" />
+                        {insight.source === "sample" ? <SampleBadge /> : <PoweredBy fn="AI_COMPLETE" />}
                       </div>
                       <p className="text-muted-foreground">{insight.summary}</p>
                     </div>
@@ -534,7 +541,6 @@ export default function Dashboard() {
                       <div className="p-4 bg-secondary/30 rounded-lg">
                         <h4 className="font-semibold mb-3 flex items-center gap-2">
                           <TrendingUp className="h-4 w-4 text-primary" /> Key Findings
-                          <CortexBadge function="EXTRACT" size="sm" />
                         </h4>
                         <ul className="space-y-2">
                           {insight.keyFindings.map((finding, i) => (
@@ -548,8 +554,7 @@ export default function Dashboard() {
 
                       <div className="p-4 bg-secondary/30 rounded-lg">
                         <h4 className="font-semibold mb-3 flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-primary" /> AI Recommendations
-                          <CortexBadge function="COMPLETE" size="sm" />
+                          <Zap className="h-4 w-4 text-primary" /> Recommendations
                         </h4>
                         <ul className="space-y-2">
                           {insight.recommendations.map((rec, i) => (
@@ -565,24 +570,14 @@ export default function Dashboard() {
                     </div>
 
                     <div className="p-3 bg-muted/50 rounded-lg border">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Info className="h-4 w-4" />
-                        <span>Cortex Functions Used:</span>
-                        <CortexBadge function="COMPLETE" size="sm" />
-                        <CortexBadge function="SENTIMENT" size="sm" />
-                        <CortexBadge function="SUMMARIZE" size="sm" />
-                        <CortexBadge function="CLASSIFY" size="sm" />
+                        {insight.source === "live" ? (
+                          <span>Live: AI_COMPLETE ({insight.model}) on totals from V_CALL_DRIVER_ANALYSIS and CALL_TRANSCRIPTS · measured latency {((insight.latencyMs ?? 0) / 1000).toFixed(1)} s · AI-generated; review before use.</span>
+                        ) : (
+                          <span>Sample: scripted text built from the same totals. In Live mode, AI_COMPLETE writes this panel from those totals.</span>
+                        )}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-4 border-t">
-                      <Button variant="outline" className="gap-2">
-                        <Mail className="h-4 w-4" />
-                        Email Report
-                      </Button>
-                      <span className="text-sm text-muted-foreground">
-                        Send this analysis to configured distribution lists
-                      </span>
                     </div>
                   </div>
                 ) : (
@@ -592,13 +587,10 @@ export default function Dashboard() {
                     </div>
                     <h3 className="font-semibold mb-2">Generate AI Insights</h3>
                     <p className="text-muted-foreground text-sm mb-4 max-w-md mx-auto">
-                      Click the button above to analyze call drivers using Snowflake Cortex LLM functions and get AI-powered recommendations
+                      Summarizes call volume, escalations, and sentiment by line of business and call reason, then suggests where to reduce repeat calls and escalations.
                     </p>
                     <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <span>Powered by:</span>
-                      <CortexBadge function="COMPLETE" size="sm" />
-                      <CortexBadge function="SENTIMENT" size="sm" />
-                      <CortexBadge function="SUMMARIZE" size="sm" />
+                      {sample ? <SampleBadge label="Sample mode: scripted response" /> : <PoweredBy fn="AI_COMPLETE" />}
                     </div>
                   </div>
                 )}
@@ -610,16 +602,10 @@ export default function Dashboard() {
         <footer className="pt-6 border-t text-center text-xs text-muted-foreground">
           <div className="flex items-center justify-center gap-2">
             <Database className="h-4 w-4" />
-            {HOSTED_EXAMPLE ? (
-              <span>Data source: built-in synthetic sample data. In your account: CONTACT_ANALYTICS.ANALYTICS with Snowflake Cortex</span>
+            {sample ? (
+              <span>Data source: built-in synthetic sample data{HOSTED_EXAMPLE ? " (hosted example)" : ""}. Illustrative example; not production or regulatory advice.</span>
             ) : (
-              <>
-                <span>Data source: CONTACT_ANALYTICS.ANALYTICS</span>
-                <span className="mx-2">•</span>
-                <span>AI: Snowflake Cortex (Llama 3.1 70B, Claude 3.5 Sonnet)</span>
-                <span className="mx-2">•</span>
-                <span>Refresh: Real-time</span>
-              </>
+              <span>Data source: CONTACT_DRIVER_EXAMPLE.ANALYTICS (synthetic) · AI: SNOWFLAKE.CORTEX.SENTIMENT, AI_CLASSIFY, and AI_COMPLETE ({model}) · Illustrative example; not production or regulatory advice.</span>
             )}
           </div>
         </footer>
@@ -629,6 +615,7 @@ export default function Dashboard() {
         open={transcriptModalOpen} 
         onOpenChange={setTranscriptModalOpen} 
         filters={transcriptFilters}
+        sample={sample}
       />
     </div>
   );

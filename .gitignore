@@ -48,3 +48,7 @@ next-env.d.ts
 
 # hosted example build
 /.api-parked/
+
+# keys
+rsa_key*
+*.p12
