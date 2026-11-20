@@ -56,6 +56,15 @@ export default function Dashboard() {
   const [selectedLob, setSelectedLob] = useState("all");
   const [selectedSegment, setSelectedSegment] = useState("all");
   const [timeframe, setTimeframe] = useState("month");
+  // Below md the pie card is too narrow for outside labels at the desktop radius.
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setNarrow(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [insightLoading, setInsightLoading] = useState(false);
   const [insightExpectedMs, setInsightExpectedMs] = useState(6000);
@@ -154,7 +163,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
@@ -166,10 +175,10 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center md:justify-end gap-3">
             <ModeChip />
             <Select value={selectedLob} onValueChange={setSelectedLob}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="flex-1 min-w-[10rem] md:flex-none md:w-48">
                 <SelectValue placeholder="Line of Business" />
               </SelectTrigger>
               <SelectContent>
@@ -180,7 +189,7 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
             <Select value={selectedSegment} onValueChange={setSelectedSegment}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="flex-1 min-w-[10rem] md:flex-none md:w-44">
                 <SelectValue placeholder="Segment" />
               </SelectTrigger>
               <SelectContent>
@@ -199,7 +208,7 @@ export default function Dashboard() {
 
       {mode && sample && (
         <div role="note" className="border-b bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          <div className="max-w-7xl mx-auto px-6 py-2 text-xs flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-2 text-xs flex flex-wrap items-center gap-x-2 gap-y-1">
             <Info className="h-3.5 w-3.5" aria-hidden="true" />
             <strong>Sample mode.</strong>
             <span>Runs in your browser on synthetic data; no Snowflake account needed. Sentiment, call summaries, and driver labels were captured from a live Cortex run; AI insights are scripted samples.</span>
@@ -208,7 +217,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
         {error && (
           <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
             <p className="font-semibold text-destructive">Live mode: a Snowflake call failed</p>
@@ -323,7 +332,7 @@ export default function Dashboard() {
         </div>
 
         <Tabs defaultValue="trends" className="space-y-4">
-          <TabsList>
+          <TabsList className="max-w-full overflow-x-auto justify-start">
             <TabsTrigger value="trends" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               Trend Analysis
@@ -340,7 +349,7 @@ export default function Dashboard() {
 
           <TabsContent value="trends" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="lg:col-span-2">
+              <Card className="lg:col-span-2 min-w-0">
                 <CardHeader>
                   <div>
                     <CardTitle>Call Volume Trend</CardTitle>
@@ -348,7 +357,7 @@ export default function Dashboard() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={{ calls: { label: "Calls", color: "var(--chart-1)" } }} className="h-72">
+                  <ChartContainer config={{ calls: { label: "Calls", color: "var(--chart-1)" } }} className="h-72 max-w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trends}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -383,7 +392,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="min-w-0">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -393,14 +402,14 @@ export default function Dashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center">
-                  <ChartContainer config={{}} className="h-72 w-full mx-auto">
+                  <ChartContainer config={{}} className="h-72 w-full mx-auto max-md:[&_.recharts-pie-label-text]:text-[11px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                         <Pie 
                           data={pieData} 
                           cx="50%" 
                           cy="50%" 
-                          outerRadius={80} 
+                          outerRadius={narrow ? 55 : 80} 
                           dataKey="value" 
                           label={({ name, percent }) => `${name.split(" ")[0]} ${(percent * 100).toFixed(0)}%`} 
                           labelLine={false}
@@ -429,7 +438,7 @@ export default function Dashboard() {
           <TabsContent value="drivers" className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center gap-2 justify-between">
                   <div>
                     <CardTitle>Top Contact Drivers</CardTitle>
                     <CardDescription>Last 4 weeks, by line of business, product, segment, and caller · click any row to view its calls</CardDescription>
@@ -490,7 +499,7 @@ export default function Dashboard() {
           <TabsContent value="insights" className="space-y-4">
             <Card className="border-primary/20">
               <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Brain className="h-5 w-5 text-primary" />
@@ -501,7 +510,7 @@ export default function Dashboard() {
                       {sample ? <SampleBadge /> : <><PoweredBy fn="AI_COMPLETE" /><span className="text-muted-foreground">{model}</span></>}
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Select value={timeframe} onValueChange={setTimeframe}>
                       <SelectTrigger className="w-32">
                         <SelectValue />

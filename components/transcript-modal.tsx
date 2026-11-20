@@ -99,8 +99,8 @@ export function TranscriptModal({ open, onOpenChange, filters, sample }: Transcr
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
+        <DialogHeader className="px-4 md:px-6 py-4 border-b">
+          <div className="flex flex-wrap items-center justify-between gap-2 pr-6 md:pr-0">
             <div>
               <DialogTitle className="text-xl flex items-center gap-2">
                 <Phone className="h-5 w-5 text-primary" />
@@ -116,7 +116,7 @@ export function TranscriptModal({ open, onOpenChange, filters, sample }: Transcr
           </div>
         </DialogHeader>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
           {loading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -131,7 +131,7 @@ export function TranscriptModal({ open, onOpenChange, filters, sample }: Transcr
             </div>
           ) : (
             <>
-              <ScrollArea className="w-[420px] min-w-[420px] border-r">
+              <ScrollArea className="h-[38%] shrink-0 border-b md:h-auto md:shrink md:w-[420px] md:min-w-[420px] md:border-b-0 md:border-r">
                 <div className="p-2 space-y-1">
                   {transcripts.map((t) => (
                     <Card
@@ -173,11 +173,11 @@ export function TranscriptModal({ open, onOpenChange, filters, sample }: Transcr
                 </div>
               </ScrollArea>
 
-              <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-y-auto md:overflow-hidden">
                 {selectedTranscript ? (
                   <>
-                    <div className="p-6 border-b bg-muted/30">
-                      <div className="flex items-start justify-between gap-4">
+                    <div className="p-4 md:p-6 border-b bg-muted/30">
+                      <div className="flex flex-wrap md:flex-nowrap items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-lg flex items-center gap-2 flex-wrap">
                             <span className="break-all">Call ID: {selectedTranscript.CALL_ID}</span>
@@ -252,8 +252,8 @@ export function TranscriptModal({ open, onOpenChange, filters, sample }: Transcr
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-auto">
-                      <div className="p-6">
+                    <div className="md:flex-1 md:overflow-auto">
+                      <div className="p-4 md:p-6">
                         <div className="flex items-center gap-2 mb-4">
                           <MessageSquare className="h-5 w-5 text-primary" />
                           <h4 className="font-semibold">Call Transcript</h4>
